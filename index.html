@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arb Scanner</title>
+<style>
+body {
+ background:#0b1220;
+ color:white;
+ font-family:Arial,sans-serif;
+ padding:18px;
+ max-width:800px;
+ margin:auto;
+}
+h1 {color:#38e8a0;}
+label {display:block;margin-top:14px;}
+input,select,button {
+ box-sizing:border-box;
+ width:100%;
+ padding:13px;
+ margin:8px 0;
+ border:1px solid #334155;
+ border-radius:10px;
+ font-size:16px;
+ background:#1e293b;
+ color:white;
+}
+button {
+ background:#16a34a;
+ font-weight:bold;
+}
+button:disabled {opacity:0.5;}
+.result {
+ background:#1e293b;
+ padding:16px;
+ margin:12px 0;
+ border-radius:12px;
+}
+.profit {color:#38e8a0;font-size:22px;}
+small {color:#94a3b8;}
+</style>
+</head>
+<body>
+
+<h1>ARB SCANNER</h1>
+<p>Gate.io + Bybit</p>
+
+<label>Капитал USDT</label>
+<input id="capital" type="number" value="1000">
+
+<label>Минимальная прибыль %</label>
+<input id="minimum" type="number" value="2">
+
+<label>Комиссия Gate %</label>
+<input id="gateFee" type="number" value="0.1" step="0.01">
+
+<label>Комиссия Bybit %</label>
+<input id="bybitFee" type="number" value="0.1" step="0.01">
+
+<label>Оценка расходов на перевод USDT</label>
+<input id="transfer" type="number" value="2">
+
+<label>Тип арбитража</label>
+<select id="mode">
+<option value="all">Все связки</option>
+<option value="cross">Межбиржевой</option>
+<option value="triangle">Треугольный</option>
+<option value="mixed">Комбинированный</option>
+</select>
+
+<button id="scan">НАЧАТЬ СКАНИРОВАНИЕ</button>
+<p id="status">Готов к запуску</p>
+<small>
+Предварительные сигналы. Ликвидность,
+сети перевода и фактические расходы
+требуют отдельной проверки.
+</small>
+<div id="results"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+async function request(url) {
+ const controller = new AbortController();
+ const timer = setTimeout(
+  () => controller.abort(), 20000
+ );
+ try {
+  const r = await fetch(url, {
+   signal:controller.signal
+  });
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  return await r.json();
+ } finally {
+  clearTimeout(timer);
+ }
+}
+
+async function gate() {
+ const [ticks,pairs] = await Promise.all([
+  request("https://api.gateio.ws/api/v4/spot/tickers"),
+  request("https://api.gateio.ws/api/v4/spot/currency_pairs")
+ ]);
+ const active = new Map(
+  pairs.filter(p=>p.trade_status==="tradable")
+  .map(p=>[p.id,p])
+ );
+ return ticks.filter(t=>active.has(t.currency_pair))
+ .map(t=>({
+  base:active.get(t.currency_pair).base,
+  quote:active.get(t.currency_pair).quote,
+  bid:Number(t.highest_bid),
+  ask:Number(t.lowest_ask)
+ }));
+}
+
+async function bybit() {
+ const t = await request(
+  "https://api.bybit.com/v5/market/tickers?category=spot"
+ );
+ if(t.retCode!==0) throw new Error(t.retMsg);
+ let cursor="", pairs=[];
+ do {
+  const p=await request(
+   "https://api.bybit.com/v5/market/instruments-info?category=spot"
+   +(cursor?"&cursor="+encodeURIComponent(cursor):"")
+  );
+  if(p.retCode!==0) throw new Error(p.retMsg);
+  pairs.push(...p.result.list);
+  cursor=p.result.nextPageCursor||"";
+ } while(cursor);
+
+ const active=new Map(
+  pairs.filter(p=>p.status==="Trading")
+  .map(p=>[p.symbol,p])
+ );
+
+ return t.result.list
+ .filter(x=>active.has(x.symbol))
+ .map(x=>({
+  base:active.get(x.symbol).baseCoin,
+  quote:active.get(x.symbol).quoteCoin,
+  bid:Number(x.bid1Price),
+  ask:Number(x.ask1Price)
+ }));
+}
+
+function graph(rows,fee) {
+ const g=new Map();
+
+ function add(a,b,r) {
+  if(!g.has(a)) g.set(a,new Map());
+  g.get(a).set(b,r*(1-fee));
+ }
+
+ for(const x of rows) {
+  if(x.bid>0 && x.ask>=x.bid) {
+   add(x.base,x.quote,x.bid);
+   add(x.quote,x.base,1/x.ask);
+  }
+ }
+ return g;
+}
+
+$("scan").onclick=async function() {
+ $("scan").disabled=true;
+ $("results").replaceChildren();
+ $("status").textContent="Получаем котировки...";
+
+ try {
+  const capital=Number($("capital").value);
+  const min=Number($("minimum").value);
+  const transfer=Number($("transfer").value);
+  const mode=$("mode").value;
+
+  const fees=[
+   Number($("gateFee").value)/100,
+   Number($("bybitFee").value)/100
+  ];
+
+  if(!(capital>0 && transfer>=0 &&
+   Number.isFinite(min) &&
+   fees.every(f=>f>=0 && f<1))) {
+   throw new Error("Проверьте параметры");
+  }
+
+  const data=await Promise.allSettled([
+   gate(),bybit()
+  ]);
+
+  const names=["Gate.io","Bybit"];
+  const graphs=data.map((d,i)=>
+   d.status==="fulfilled"
+   ?graph(d.value,fees[i]):null
+  );
+
+  const found=[];
+
+  function save(type,route,end) {
+   const profit=end-capital;
+   const pct=profit/capital*100;
+
+   if(Number.isFinite(pct) && pct>=min) {
+    found.push({type,route,profit,pct});
+   }
+  }
+
+  for(let i=0;i<2;i++) {
+   const g=graphs[i];
+   const other=graphs[1-i];
+   if(!g) continue;
+
+   for(const [a,r1] of g.get("USDT")||[]) {
+
+    if(mode==="all" || mode==="triangle") {
+     for(const [b,r2] of g.get(a)||[]) {
+      if(b==="USDT" || b===a) continue;
+      const r3=g.get(b)?.get("USDT");
+
+      if(r3) save(
+       "Треугольный",
+       names[i]+": USDT → "+a+" → "+b+" → USDT",
+       capital*r1*r2*r3
+      );
+     }
+    }
+
+    if(!other || capital<=transfer) continue;
+
+    if(mode==="all" || mode==="cross") {
+     const r2=other.get(a)?.get("USDT");
+
+     if(r2) save(
+      "Межбиржевой",
+      names[i]+" → "+names[1-i]+": "+a,
+      (capital-transfer)*r1*r2
+     );
+    }
+
+    if(mode==="all" || mode==="mixed") {
+     for(const [b,r2] of other.get(a)||[]) {
+      if(b==="USDT" || b===a) continue;
+      const r3=other.get(b)?.get("USDT");
+
+      if(r3) save(
+       "Комбинированный",
+       names[i]+" → "+names[1-i]+
+       ": USDT → "+a+" → "+b+" → USDT",
+       (capital-transfer)*r1*r2*r3
+      );
+     }
+    }
+   }
+  }
+
+  found.sort((a,b)=>b.pct-a.pct);
+
+  $("status").textContent=data.map((d,i)=>
+   names[i]+": "+
+   (d.status==="fulfilled"
+    ?d.value.length+" пар"
+    :"Ошибка "+d.reason.message)
+  ).join(" | ")+" | Сигналов: "+found.length+
+  " | "+new Date().toLocaleTimeString();
+
+  for(const x of found.slice(0,100)) {
+   const div=document.createElement("div");
+   div.className="result";
+
+   const type=document.createElement("small");
+   type.textContent=x.type;
+
+   const route=document.createElement("p");
+   route.textContent=x.route;
+
+   const profit=document.createElement("div");
+   profit.className="profit";
+   profit.textContent=x.pct.toFixed(2)+"%";
+
+   const amount=document.createElement("p");
+   amount.textContent="Оценка прибыли: "+
+    x.profit.toFixed(2)+" USDT";
+
+   div.append(type,route,profit,amount);
+   $("results").append(div);
+  }
+
+ } catch(e) {
+  $("status").textContent="Ошибка: "+e.message;
+ } finally {
+  $("scan").disabled=false;
+ }
+};
+</script>
+</body>
+</html>
