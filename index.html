@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Arb Scanner 3.0</title>
+<title>Arb Scanner 4.0</title>
 <style>
 body {
  background:#0b1220;
@@ -43,7 +43,7 @@ small {color:#94a3b8;display:block;line-height:1.5;margin:10px 0;} .result a{dis
 </head>
 <body>
 
-<h1>ARB SCANNER 3.0</h1>
+<h1>ARB SCANNER 4.0</h1>
 <p>Gate.io + Bybit</p>
 
 <label>Капитал USDT</label>
@@ -61,7 +61,7 @@ small {color:#94a3b8;display:block;line-height:1.5;margin:10px 0;} .result a{dis
 <label>Резерв расходов на оба перевода (USDT)</label>
 <input id="transfer" type="number" value="2">
 
-<label>Адрес сервера проверки сетей (HTTPS, необязательно)</label><input id="backend" type="url" placeholder="https://...workers.dev"><label>Тип арбитража</label>
+<input id="backend" type="hidden"><label>Тип арбитража</label>
 <select id="mode">
 <option value="all">Все связки</option>
 <option value="cross">Межбиржевой</option>
@@ -71,12 +71,12 @@ small {color:#94a3b8;display:block;line-height:1.5;margin:10px 0;} .result a{dis
 
 <button id="scan">НАЧАТЬ СКАНИРОВАНИЕ</button>
 <button id="auto">Автообновление: выключено</button><p id="status">Готов к запуску</p>
-<small>Проверка стаканов до 50 уровней. Для автоматической проверки сетей подключите сервер. Без него межбиржевые сигналы остаются неподтверждёнными. Автоматических сделок нет.</small>
+<small>Проверка стаканов до 50 уровней. Межбиржевые сигналы требуют ручной проверки контракта, сетей и комиссий. Автоматических сделок нет.</small>
 <label><input id="unverified" type="checkbox" style="width:auto"> Показать неподтверждённые межбиржевые сигналы</label><div id="results"></div>
 
 <script>
 const $ = id => document.getElementById(id);
-$("backend").value=localStorage.getItem("arbBackend")||"";
+$("backend").value="";
 $("backend").onchange=()=>localStorage.setItem("arbBackend",$("backend").value.trim());
 
 async function request(url) {
@@ -192,7 +192,7 @@ async function scan(){
  const cards=[];
  candidates.sort((a,b)=>b.end-a.end);
  const cache=new Map();let passed=0,errors=0,thin=0;
- const batch=candidates.slice(0,20);
+ const batch=candidates.slice(0,40);
  for(let offset=0;offset<batch.length;offset+=4){
  await Promise.all(batch.slice(offset,offset+4).map(async c=>{
  try{
@@ -204,7 +204,7 @@ async function scan(){
  function line(t,tag="p"){const p=document.createElement(tag);p.textContent=t;div.append(p);return p;}
  line(c.type+" | "+(c.cross?(confirmed?"Сети и комиссии проверены; лимиты аккаунта не проверены":"НЕ ПОДТВЕРЖДЕНА СЕТЬ"):"Проверен стакан; не гарантия исполнения"),"small");
  line(c.coins.join(" → ")+" | "+c.edges.map(e=>names[e.i]).join(" → "));
- line("Расчётная прибыль после расходов: "+pct.toFixed(2)+"% / "+(end-capital).toFixed(2)+" USDT").className=c.cross&&!confirmed?"":"profit";
+ line("Оценка результата после заданных расходов: "+pct.toFixed(2)+"% / "+(end-capital).toFixed(2)+" USDT").className=c.cross&&!confirmed?"":"profit";
  line("Итог: "+end.toFixed(2)+" USDT");
  details.forEach((d,n)=>line(names[c.edges[n].i]+": "+d.before.toPrecision(8)+" "+c.coins[n]+" → "+d.after.toPrecision(8)+" "+c.coins[n+1]+" | средняя цена "+d.price.toPrecision(8)+" "+c.edges[n].x.quote+"/"+c.edges[n].x.base,"small"));
  c.edges.forEach((e,n)=>{const a=document.createElement("a");a.href=link(e);a.target="_blank";a.rel="noopener";a.style.color="#93c5fd";a.textContent=names[e.i]+": "+c.coins[n]+" → "+c.coins[n+1];div.append(a,document.createElement("br"));});
@@ -213,7 +213,7 @@ async function scan(){
  for(const t of ["Одинаковая сеть и контракт монеты "+c.coins[1],"Вывод монеты открыт на первой бирже, ввод на второй","Обратный перевод USDT: сеть, ввод и вывод открыты","Проверены фактические комиссии, минимумы и лимиты"]){const l=document.createElement("label"),box=document.createElement("input");box.type="checkbox";box.style.width="auto";l.append(box,document.createTextNode(" "+t));div.append(l);}
  line("Ручные отметки не подтверждают прибыль автоматически.","small");
  }else line("Проверьте минимальные суммы, шаг количества и актуальность котировок.","small");
- cards.push({pct,div});
+ if(c.cross && !confirmed && pct>5){line("ВНИМАНИЕ: аномальный спред — возможны разные токены или закрытые депозиты.","small");} cards.push({pct,div});
  }catch(e){errors++;}
  }));
  }
@@ -222,8 +222,8 @@ async function scan(){
  if(!passed){$("results").textContent="Нет сигналов, прошедших проверку в этой выборке.";}
  }catch(e){$("status").textContent="Ошибка: "+e.message;}finally{busy=false;$("scan").disabled=false;}
 }
-</script><section class="result"><h2>Арбитраж — Армения</h2><small>Курсы вводятся как количество получаемой валюты за единицу отдаваемой. Наличные и безналичные средства учитываются отдельно: например AMD-cash и AMD-card. Автоматический источник ниже — справочный, не исполнимая котировка.</small><label>Начальный актив</label><input id="amStart" value="USDT"><label>Капитал в начальном активе</label><input id="amCapital" type="number" value="1000"><label>Курсы: источник; отдаём; получаем; курс; комиссия %; фиксированная комиссия в получаемой валюте; максимум отдаваемой валюты</label><textarea id="amRates" rows="6" style="width:100%;background:#0b1220;color:white" placeholder="Обменник A;USDT;AMD-cash;380;0;0;1000"></textarea><button id="amScan">Найти замкнутые круги</button><button id="amAuto">Загрузить справочные валютные курсы</button><div id="amRef"></div><div id="amResults"></div><a href="https://rate.am" style="color:#93c5fd">Rate.am</a> · <a href="https://www.bestchange.com/" style="color:#93c5fd">BestChange</a></section>
-<section class="result"><h2>Спот / фьючерсы и фандинг</h2><label>Минимальный спред или разница фандинга, %</label><input id="derMin" type="number" value="0.1" step="0.01"><button id="derScan">Проверить Gate и Bybit</button><small>Предварительные сигналы по котировкам, без проверки глубины фьючерсного стакана, маржи и комиссий закрытия. Фандинг сравнивается только при совпадающих интервалах и времени выплаты; ставки могут измениться.</small><div id="derResults"></div></section>
+</script><section class="result"><h2>Арбитраж — Армения</h2><small>Курсы вводятся как количество получаемой валюты за единицу отдаваемой. Наличные и безналичные средства учитываются отдельно: например AMD-cash и AMD-card. Автоматический источник ниже — справочный, не исполнимая котировка.</small><label>Начальный актив</label><input id="amStart" value="USDT"><label>Капитал в начальном активе</label><input id="amCapital" type="number" value="1000"><label>Курсы: источник; отдаём; получаем; курс; комиссия %; фиксированная комиссия в получаемой валюте; максимум отдаваемой валюты</label><textarea id="amRates" rows="6" style="width:100%;background:#0b1220;color:white" placeholder="Обменник A;USDT;AMD-cash;380;0;0;1000"></textarea><button id="amScan">Найти замкнутые круги</button><button id="amAuto">Загрузить справочные валютные курсы</button><div id="amRef"></div><h3>Публичные курсы обменных пунктов</h3><button id="publicRates">Загрузить опубликованные курсы</button><div id="publicResults"></div><small>Публичная котировка не гарантирует объём, наличие наличных или отсутствие комиссии. USD не равен USDT.</small><a href="https://www.rate.am/en/search" target="_blank" rel="noopener" style="color:#93c5fd">Актуальные предложения Rate.am</a><div id="amResults"></div><a href="https://rate.am" style="color:#93c5fd">Rate.am</a> · <a href="https://www.bestchange.com/" style="color:#93c5fd">BestChange</a></section>
+<section class="result"><h2>Спот / фьючерсы и фандинг</h2><label>Минимальный валовой базис, %</label><input id="derMin" type="number" value="0.1" step="0.01"><button id="derScan">Проверить Gate и Bybit</button><small>Предварительные сигналы по котировкам, без проверки глубины фьючерсного стакана, маржи и комиссий закрытия. Фандинг сравнивается только при совпадающих интервалах и времени выплаты; ставки могут измениться.</small><div id="derResults"></div></section>
 <script>
 (()=>{
 const el=id=>document.getElementById(id);
@@ -233,7 +233,9 @@ if(Math.abs(cycles([{a:"U",b:"A",rate:380,fee:0,fixed:0,max:1000},{a:"A",b:"U",r
 el("amRates").value=localStorage.getItem("amRates")||"";
 el("amScan").onclick=()=>{try{const raw=el("amRates").value;localStorage.setItem("amRates",raw);const start=el("amStart").value.trim().toUpperCase(),capital=Number(el("amCapital").value);if(!(capital>0&&start))throw Error("Проверьте капитал");const edges=raw.split(/\n/).filter(x=>x.trim()).map((line,i)=>{const [source,a,b,r,f,k,m]=line.split(";").map(x=>x.trim());const [rate,fee,fixed,max]=[r,f,k,m].map(Number);if(!source||!a||!b||![r,f,k,m].every(x=>x!==undefined&&x!=="")||![rate,fee,fixed,max].every(Number.isFinite)||!(rate>0&&fee>=0&&fee<100&&fixed>=0&&max>0))throw Error("Неверная строка "+(i+1));return {source,a:a.toUpperCase(),b:b.toUpperCase(),rate,fee,fixed,max};});const found=cycles(edges,start,capital).filter(x=>x.next>capital);say("amResults",found.length?found.slice(0,20).map(x=>x.p.map(e=>e.source+": "+e.a+" → "+e.b).join(" | ")+" | "+x.next.toFixed(2)+" "+start+" | +"+((x.next/capital-1)*100).toFixed(2)+"%").join("\n\n"):"Прибыльных кругов по введённым курсам нет");}catch(e){say("amResults",e.message);}};
 el("amAuto").onclick=async()=>{try{const r=await request("https://open.er-api.com/v6/latest/USD");if(r.result!=="success")throw Error("Источник недоступен");say("amRef","Справочный курс USD: "+r.rates.AMD+" AMD; "+r.rates.RUB+" RUB. Дата: "+r.time_last_update_utc+". Не включён в торговые круги.");}catch(e){say("amRef","Ошибка загрузки: "+e.message);}};
-el("derScan").onclick=async()=>{el("derScan").disabled=true;say("derResults","Загрузка...");try{const min=Number(el("derMin").value);if(!Number.isFinite(min)||min<0)throw Error("Проверьте порог");const [g,b,gs,bs]=await Promise.all([request(api+"/futures/usdt/tickers"),request("https://api.bybit.com/v5/market/tickers?category=linear"),gate(),bybit()]);if(b.retCode!==0)throw Error(b.retMsg);const rows=[];for(const [name,spot,fut] of [["Gate",gs,g.map(x=>({symbol:x.contract,bid:Number(x.highest_bid),fund:Number(x.funding_rate)}))],["Bybit",bs,b.result.list.map(x=>({symbol:x.symbol,bid:Number(x.bid1Price),fund:Number(x.fundingRate)}))]]){const map=new Map(fut.map(x=>[x.symbol,x]));for(const s of spot){if(s.quote!=="USDT"||!(s.ask>0))continue;const f=map.get(s.symbol);if(!f||!(f.bid>0))continue;const pct=(f.bid/s.ask-1)*100;if(pct>=min)rows.push({pct,t:name+" "+s.base+" | спот покупка "+s.ask+" / шорт "+f.bid+" | валовой базис "+pct.toFixed(3)+"% | фандинг "+(f.fund*100).toFixed(4)+"% (интервал не проверен)"});}}say("derResults",rows.sort((a,b)=>b.pct-a.pct).slice(0,30).map(x=>x.t).join("\n\n")||"Нет кандидатов по заданному порогу. Межбиржевой фандинг пока не подтверждается: нужны интервалы и время выплат.");}catch(e){say("derResults","Ошибка: "+e.message);}finally{el("derScan").disabled=false;}};
+el("derScan").onclick=async()=>{el("derScan").disabled=true;say("derResults","Загрузка...");try{const min=Number(el("derMin").value);if(!Number.isFinite(min)||min<0)throw Error("Проверьте порог");const [g,b,gs,bs]=await Promise.all([request(api+"/futures/usdt/tickers"),request("https://api.bybit.com/v5/market/tickers?category=linear"),gate(),bybit()]);if(b.retCode!==0)throw Error(b.retMsg);const rows=[];for(const [name,spot,fut] of [["Gate",gs,g.map(x=>({symbol:x.contract,bid:Number(x.highest_bid),fund:Number(x.funding_rate)}))],["Bybit",bs,b.result.list.map(x=>({symbol:x.symbol,bid:Number(x.bid1Price),fund:Number(x.fundingRate)}))]]){const map=new Map(fut.map(x=>[x.symbol,x]));for(const s of spot){if(s.quote!=="USDT"||!(s.ask>0))continue;const f=map.get(s.symbol);if(!f||!(f.bid>0))continue;const pct=(f.bid/s.ask-1)*100;if(pct>=min)rows.push({pct,t:name+" "+s.base+" | спот покупка "+s.ask+" / шорт "+f.bid+" | "+(pct>5?"АНОМАЛИЯ — проверить актив | ":"")+"валовой базис "+pct.toFixed(3)+"% | фандинг "+(f.fund*100).toFixed(4)+"% (интервал не проверен)"});}}say("derResults",rows.sort((a,b)=>b.pct-a.pct).slice(0,30).map(x=>x.t).join("\n\n")||"Нет кандидатов по заданному порогу. Межбиржевой фандинг пока не подтверждается: нужны интервалы и время выплат.");}catch(e){say("derResults","Ошибка: "+e.message);}finally{el("derScan").disabled=false;}};
 for(const id of ["amResults","amRef","derResults"])el(id).style.whiteSpace="pre-wrap";
 })();
+</script><script>
+(()=>{const rows=[["88 Supermarket Mashtots",359,361.5,"18:26"],["88 Supermarket Nor-Norq",359,361.5,"18:26"],["Yeritsyan Komitas",359,361,"18:26"],["Kanach Supermarket",359,361,"18:25"]]; const out=document.getElementById("publicResults");document.getElementById("publicRates").onclick=()=>{out.replaceChildren();const p=document.createElement("p");p.textContent="Снимок Rate.am: 25.11.2026, время Еревана. НЕ live. USD наличные / AMD наличные.";out.append(p);for(const [name,buy,sell,time] of rows){const d=document.createElement("p");d.textContent=name+" | покупка "+buy+" | продажа "+sell+" AMD/USD | "+time;out.append(d);}const bestBuy=Math.max(...rows.map(r=>r[1])),bestSell=Math.min(...rows.map(r=>r[2]));const d=document.createElement("p");d.textContent="Лучший опубликованный круг USD → AMD → USD: "+((bestBuy/bestSell-1)*100).toFixed(2)+"% до дополнительных расходов. Снимок не участвует в автоматических кругах.";out.append(d);};})();
 </script></body></html>
