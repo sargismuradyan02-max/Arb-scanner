@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Arb Scanner 4.0</title>
+<title>Arb Scanner 4.1</title>
 <style>
 body {
  background:#0b1220;
@@ -43,7 +43,7 @@ small {color:#94a3b8;display:block;line-height:1.5;margin:10px 0;} .result a{dis
 </head>
 <body>
 
-<h1>ARB SCANNER 4.0</h1>
+<h1>ARB SCANNER 4.1</h1>
 <p>Gate.io + Bybit</p>
 
 <label>Капитал USDT</label>
@@ -237,5 +237,5 @@ el("derScan").onclick=async()=>{el("derScan").disabled=true;say("derResults","З
 for(const id of ["amResults","amRef","derResults"])el(id).style.whiteSpace="pre-wrap";
 })();
 </script><script>
-(()=>{const rows=[["88 Supermarket Mashtots",359,361.5,"18:26"],["88 Supermarket Nor-Norq",359,361.5,"18:26"],["Yeritsyan Komitas",359,361,"18:26"],["Kanach Supermarket",359,361,"18:25"]]; const out=document.getElementById("publicResults");document.getElementById("publicRates").onclick=()=>{out.replaceChildren();const p=document.createElement("p");p.textContent="Снимок Rate.am: 25.11.2026, время Еревана. НЕ live. USD наличные / AMD наличные.";out.append(p);for(const [name,buy,sell,time] of rows){const d=document.createElement("p");d.textContent=name+" | покупка "+buy+" | продажа "+sell+" AMD/USD | "+time;out.append(d);}const bestBuy=Math.max(...rows.map(r=>r[1])),bestSell=Math.min(...rows.map(r=>r[2]));const d=document.createElement("p");d.textContent="Лучший опубликованный круг USD → AMD → USD: "+((bestBuy/bestSell-1)*100).toFixed(2)+"% до дополнительных расходов. Снимок не участвует в автоматических кругах.";out.append(d);};})();
+(()=>{const out=document.getElementById("publicResults");async function load(){out.textContent="Загрузка...";try{const d=await request("./rates.json?t="+Date.now());const age=(Date.now()-Date.parse(d.fetched))/60000;if(!Number.isFinite(age)||age<0||age>60)throw Error("Снимок устарел или ещё не создан");out.textContent="Получено: "+new Date(d.fetched).toLocaleString()+"\n"+d.sources.map(s=>s.name+": "+(s.error||s.rows.map(r=>r.name+" | "+r.pair+" | покупка "+r.buy+" / продажа "+r.sell).join("\n"))).join("\n\n")+"\nПредварительные котировки: время публикации, лимиты и комиссии необходимо проверить. Не включены в подтверждённые круги.";}catch(e){out.textContent="Нет свежих данных: "+e.message;}}out.style.whiteSpace="pre-wrap";document.getElementById("publicRates").onclick=load;load();setInterval(load,300000);})();
 </script></body></html>
