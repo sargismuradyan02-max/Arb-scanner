@@ -1,0 +1,69 @@
+{
+  "fetched": "2026-11-25T19:27:51.043317+00:00",
+  "sources": [
+    {
+      "name": "SwapGo public indicative averages",
+      "rows": [
+        {
+          "name": "Yerevan indicative average",
+          "pair": "USDT/AMD",
+          "buy": 354.0,
+          "sell": 363.0
+        },
+        {
+          "name": "Yerevan indicative average",
+          "pair": "USD/AMD",
+          "buy": 358.0,
+          "sell": 362.0
+        },
+        {
+          "name": "Yerevan indicative average",
+          "pair": "EUR/AMD",
+          "buy": 393.0,
+          "sell": 397.0
+        },
+        {
+          "name": "Yerevan indicative average",
+          "pair": "RUB/AMD",
+          "buy": 4.24,
+          "sell": 4.28
+        },
+        {
+          "name": "Yerevan indicative average",
+          "pair": "GEL/AMD",
+          "buy": 138.0,
+          "sell": 140.0
+        },
+        {
+          "name": "Yerevan indicative average",
+          "pair": "GBP/AMD",
+          "buy": 466.0,
+          "sell": 485.0
+        }
+      ]
+    },
+    {
+      "name": "CB.am reference rates",
+      "rows": [
+        {
+          "name": "Reference only, not exchange quote",
+          "pair": "USD/AMD",
+          "buy": 360.29,
+          "sell": 360.29
+        },
+        {
+          "name": "Reference only, not exchange quote",
+          "pair": "EUR/AMD",
+          "buy": 394.05,
+          "sell": 394.05
+        },
+        {
+          "name": "Reference only, not exchange quote",
+          "pair": "RUB/AMD",
+          "buy": 4.3698,
+          "sell": 4.3698
+        }
+      ]
+    }
+  ]
+}
