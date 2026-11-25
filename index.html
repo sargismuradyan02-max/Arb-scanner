@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Arb Scanner 4.1</title>
+<title>Arb Scanner 4.2</title>
 <style>
 body {
  background:#0b1220;
@@ -43,7 +43,7 @@ small {color:#94a3b8;display:block;line-height:1.5;margin:10px 0;} .result a{dis
 </head>
 <body>
 
-<h1>ARB SCANNER 4.1</h1>
+<h1>ARB SCANNER 4.2</h1>
 <p>Gate.io + Bybit</p>
 
 <label>Капитал USDT</label>
@@ -69,10 +69,10 @@ small {color:#94a3b8;display:block;line-height:1.5;margin:10px 0;} .result a{dis
 <option value="mixed">Комбинированный</option>
 </select>
 
-<button id="scan">НАЧАТЬ СКАНИРОВАНИЕ</button>
+<label>Дополнительный запас на изменение цены за круг (%)</label><input id="riskBuffer" type="number" min="0" max="20" step="0.1" value="0.5"><label><input id="sound" type="checkbox" style="width:auto"> Звук для новых внутрибиржевых кандидатов</label><button id="scan">НАЧАТЬ СКАНИРОВАНИЕ</button>
 <button id="auto">Автообновление: выключено</button><p id="status">Готов к запуску</p>
 <small>Проверка стаканов до 50 уровней. Межбиржевые сигналы требуют ручной проверки контракта, сетей и комиссий. Автоматических сделок нет.</small>
-<label><input id="unverified" type="checkbox" style="width:auto"> Показать неподтверждённые межбиржевые сигналы</label><div id="results"></div>
+<label><input id="unverified" type="checkbox" style="width:auto"> Показать неподтверждённые межбиржевые сигналы</label><div id="results"></div><details class="result"><summary>Журнал наблюдений (не реальные сделки)</summary><button id="clearHistory">Очистить журнал</button><div id="history"></div></details>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -172,7 +172,7 @@ $("scan").onclick=scan;
 async function scan(){
  if(busy)return;busy=true;$("scan").disabled=true;$("results").replaceChildren();$("status").textContent="Получаем котировки...";
  try{
- const capital=Number($("capital").value),min=Number($("minimum").value),reserve=Number($("transfer").value),mode=$("mode").value;
+ const started=Date.now(),buffer=Number($("riskBuffer").value)/100;if(!Number.isFinite(buffer)||buffer<0||buffer>0.2)throw Error("Неверный запас");const capital=Number($("capital").value),min=Number($("minimum").value),reserve=Number($("transfer").value),mode=$("mode").value;
  const fees=[Number($("gateFee").value)/100,Number($("bybitFee").value)/100];
  if(!(capital>0&&reserve>=0&&Number.isFinite(min)&&fees.every(f=>f>=0&&f<1)))throw Error("Проверьте параметры");
  const data=await Promise.allSettled([gate(),bybit()]);
@@ -199,7 +199,7 @@ async function scan(){
  const from=c.edges[0].i;const outbound=c.cross?await route(c.coins[1],from):null;const back=c.cross?await route("USDT",1-from):null;const valid=x=>x&&x.ok===true&&typeof x.fee==="number"&&x.fee>=0&&Number.isFinite(x.fee)&&typeof x.min==="number"&&x.min>=0&&typeof x.depositMin==="number"&&x.depositMin>=0;const confirmed=c.cross&&valid(outbound)&&valid(back);if(c.cross&&!confirmed&&!showUnknown){hidden++;return;}
  const books=await Promise.all(c.edges.map(e=>{const key=e.i+":"+e.x.symbol+":"+e.buy;if(!cache.has(key))cache.set(key,book(e));return cache.get(key);}));
  let amount=capital;const details=[];for(let n=0;n<c.edges.length;n++){const before=amount,e=c.edges[n];amount=fill(amount,books[n],e.buy,e.fee);if(amount===null){thin++;return;}const gross=amount/(1-e.fee);details.push({before,after:amount,price:e.buy?before/gross:gross/before});if(n===0&&confirmed){if(amount<outbound.min||amount<=outbound.fee||amount-outbound.fee<outbound.depositMin)return;amount-=outbound.fee;}}
- if(confirmed&&(amount<back.min||amount<=back.fee||amount-back.fee<back.depositMin))return;const end=amount-(c.cross?(confirmed?back.fee:reserve):0),pct=(end-capital)/capital*100;if(pct<min)return;passed++;
+ if(confirmed&&(amount<back.min||amount<=back.fee||amount-back.fee<back.depositMin))return;const end=amount*(1-buffer)-(c.cross?(confirmed?back.fee:reserve):0),pct=(end-capital)/capital*100;if(pct<min||Date.now()-started>45000)return;passed++;
  const div=document.createElement("div");div.className="result";
  function line(t,tag="p"){const p=document.createElement(tag);p.textContent=t;div.append(p);return p;}
  line(c.type+" | "+(c.cross?(confirmed?"Сети и комиссии проверены; лимиты аккаунта не проверены":"НЕ ПОДТВЕРЖДЕНА СЕТЬ"):"Проверен стакан; не гарантия исполнения"),"small");
@@ -213,11 +213,11 @@ async function scan(){
  for(const t of ["Одинаковая сеть и контракт монеты "+c.coins[1],"Вывод монеты открыт на первой бирже, ввод на второй","Обратный перевод USDT: сеть, ввод и вывод открыты","Проверены фактические комиссии, минимумы и лимиты"]){const l=document.createElement("label"),box=document.createElement("input");box.type="checkbox";box.style.width="auto";l.append(box,document.createTextNode(" "+t));div.append(l);}
  line("Ручные отметки не подтверждают прибыль автоматически.","small");
  }else line("Проверьте минимальные суммы, шаг количества и актуальность котировок.","small");
- if(c.cross && !confirmed && pct>5){line("ВНИМАНИЕ: аномальный спред — возможны разные токены или закрытые депозиты.","small");} cards.push({pct,div});
+ if(c.cross && !confirmed && pct>5){line("ВНИМАНИЕ: аномальный спред — возможны разные токены или закрытые депозиты.","small");} line("Запас на изменение цены: "+(buffer*100).toFixed(2)+"%; наблюдение "+new Date().toLocaleTimeString(),"small");cards.push({pct,div,cross:c.cross,route:c.coins.join(" → ")+" | "+c.edges.map(e=>names[e.i]).join(" → "),end,capital});
  }catch(e){errors++;}
  }));
  }
- cards.sort((a,b)=>b.pct-a.pct).forEach(x=>$("results").append(x.div));
+ cards.sort((a,b)=>Number(a.cross)-Number(b.cross)||b.pct-a.pct).forEach(x=>$("results").append(x.div)); if(typeof recordSignals==="function")recordSignals(cards);
  $("status").textContent=data.map((d,i)=>names[i]+": "+(d.status==="fulfilled"?d.value.length+" пар":"Ошибка "+d.reason.message)).join(" | ")+" | Скрыто неподтверждённых "+hidden+" | Кандидатов "+candidates.length+", проверено "+batch.length+", прошло "+passed+", недостаточно объёма "+thin+", ошибок стакана "+errors+" | "+new Date().toLocaleTimeString();
  if(!passed){$("results").textContent="Нет сигналов, прошедших проверку в этой выборке.";}
  }catch(e){$("status").textContent="Ошибка: "+e.message;}finally{busy=false;$("scan").disabled=false;}
@@ -238,4 +238,14 @@ for(const id of ["amResults","amRef","derResults"])el(id).style.whiteSpace="pre-
 })();
 </script><script>
 (()=>{const out=document.getElementById("publicResults");async function load(){out.textContent="Загрузка...";try{const d=await request("./rates.json?t="+Date.now());const age=(Date.now()-Date.parse(d.fetched))/60000;if(!Number.isFinite(age)||age<0||age>60)throw Error("Снимок устарел или ещё не создан");out.textContent="Получено: "+new Date(d.fetched).toLocaleString()+"\n"+d.sources.map(s=>s.name+": "+(s.error||s.rows.map(r=>r.name+" | "+r.pair+" | покупка "+r.buy+" / продажа "+r.sell).join("\n"))).join("\n\n")+"\nПредварительные котировки: время публикации, лимиты и комиссии необходимо проверить. Не включены в подтверждённые круги.";}catch(e){out.textContent="Нет свежих данных: "+e.message;}}out.style.whiteSpace="pre-wrap";document.getElementById("publicRates").onclick=load;load();setInterval(load,300000);})();
+</script><script>
+const settingIds=["capital","minimum","gateFee","bybitFee","transfer","mode","riskBuffer","sound","unverified","amStart","amCapital","derMin"];
+for(const id of settingIds){const e=$(id);try{const v=localStorage.getItem("arb42:"+id);if(v!==null){if(e.type==="checkbox")e.checked=v==="true";else e.value=v;}}catch{}e.addEventListener("change",()=>{try{localStorage.setItem("arb42:"+id,e.type==="checkbox"?String(e.checked):e.value);}catch{}});}
+let observations=[];try{observations=JSON.parse(localStorage.getItem("arb42:history")||"[]");if(!Array.isArray(observations))observations=[];}catch{}
+function showHistory(){$("history").style.whiteSpace="pre-wrap";$("history").textContent=observations.map(x=>new Date(x.time).toLocaleString()+" | "+x.route+" | "+x.pct.toFixed(2)+"% | "+(x.cross?"сеть не подтверждена":"кандидат, не сделка")).join("\n")||"Пока нет наблюдений";}
+$("clearHistory").onclick=()=>{observations=[];try{localStorage.removeItem("arb42:history");}catch{}showHistory();};
+let audio=null;function arm(){if(!$("sound").checked)return;try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();audio.resume();}catch{}}
+$("scan").addEventListener("click",arm);$("auto").addEventListener("click",arm);
+function recordSignals(cards){const now=Date.now();let notify=false;for(const c of cards){if(observations.some(x=>x.route===c.route&&now-x.time<60000))continue;observations.unshift({time:now,route:c.route,pct:c.pct,cross:c.cross});if(!c.cross)notify=true;}observations=observations.slice(0,200);try{localStorage.setItem("arb42:history",JSON.stringify(observations));}catch{}showHistory();if(notify&&audio&&$("sound").checked){try{const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=660;g.gain.value=.08;o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+.18);}catch{}}}
+showHistory();setInterval(()=>{if(!busy&&$("results").children.length&&observations.length&&Date.now()-observations[0].time>60000){$("results").replaceChildren();$("results").textContent="Котировки устарели — повторите сканирование."; }},5000);
 </script></body></html>
