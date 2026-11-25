@@ -1,0 +1,29 @@
+name: Public arbitrage signals
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '3,13,23,33,43,53 * * * *'
+  push:
+    paths:
+      - scripts/collect_signals.py
+      - .github/workflows/public-signals.yml
+permissions:
+  contents: write
+concurrency:
+  group: public-signals
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/collect_signals.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add signals.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Refresh public arbitrage signals"
+          git pull --rebase
+          git push
