@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Arb Scanner 4.3</title>
+<title>Arb Scanner 4.4</title>
 <style>
 body {
  background:#0b1220;
@@ -43,10 +43,10 @@ small {color:#94a3b8;display:block;line-height:1.5;margin:10px 0;} .result a{dis
 </head>
 <body>
 
-<h1>ARB SCANNER 4.3</h1>
+<h1>ARB SCANNER 4.4</h1>
 <p>Gate + Bybit + OKX + MEXC + Bitget</p>
 
-<label>Капитал USDT</label>
+<fieldset style="border:1px solid #334155;border-radius:12px;padding:12px"><legend>Выбор бирж</legend><div style="display:flex;flex-wrap:wrap;gap:12px"><label style="margin:0"><input type="checkbox" id="exchange0" checked style="width:auto"> Gate</label><label style="margin:0"><input type="checkbox" id="exchange1" checked style="width:auto"> Bybit</label><label style="margin:0"><input type="checkbox" id="exchange2" checked style="width:auto"> OKX</label><label style="margin:0"><input type="checkbox" id="exchange3" checked style="width:auto"> MEXC</label><label style="margin:0"><input type="checkbox" id="exchange4" checked style="width:auto"> Bitget</label></div><button type="button" id="allEx">Выбрать все</button><button type="button" id="noneEx">Снять все</button><small>Выбор действует на спот и фьючерсы. Для межбиржевого поиска нужны минимум две биржи.</small></fieldset><label>Капитал USDT</label>
 <input id="capital" type="number" value="1000">
 
 <label>Минимальная прибыль %</label>
@@ -152,6 +152,9 @@ async function okx(){const [t,p]=await Promise.all([request(ox+"/market/tickers?
 async function mexc(){const [t,p]=await Promise.all([request(mx+"/api/v3/ticker/bookTicker"),request(mx+"/api/v3/exchangeInfo")]);const m=new Map(p.symbols.filter(x=>String(x.status)==="1"&&x.isSpotTradingAllowed!==false).map(x=>[x.symbol,x]));return t.filter(x=>m.has(x.symbol)).map(x=>({symbol:x.symbol,base:m.get(x.symbol).baseAsset,quote:m.get(x.symbol).quoteAsset,bid:+x.bidPrice,ask:+x.askPrice}));}
 async function bitget(){const [t,p]=await Promise.all([request(bg+"/spot/market/tickers"),request(bg+"/spot/public/symbols")]);const m=new Map(checked(p,"00000").filter(x=>x.status==="online").map(x=>[x.symbol,x]));return checked(t,"00000").filter(x=>m.has(x.symbol)).map(x=>({symbol:x.symbol,base:m.get(x.symbol).baseCoin,quote:m.get(x.symbol).quoteCoin,bid:+x.bidPr,ask:+x.askPr}));}
 const spotLoaders=[gate,bybit,okx,mexc,bitget];
+function selectedEx(){return names.map((_,i)=>document.getElementById("exchange"+i).checked);}
+function requireEx(){const a=selectedEx();if(!a.some(Boolean))throw Error("Выберите хотя бы одну биржу");return a;}
+for(const [id,v] of [["allEx",true],["noneEx",false]])document.getElementById(id).onclick=()=>names.forEach((_,i)=>{const e=document.getElementById("exchange"+i);e.checked=v;e.dispatchEvent(new Event("change"));});
 const api="https://api.gateio.ws/api/v4";
 function graph(rows,i,fee){
  const g=new Map();
@@ -185,7 +188,7 @@ async function scan(){
  const started=Date.now(),buffer=Number($("riskBuffer").value)/100;if(!Number.isFinite(buffer)||buffer<0||buffer>0.2)throw Error("Неверный запас");const capital=Number($("capital").value),min=Number($("minimum").value),reserve=Number($("transfer").value),mode=$("mode").value;
  const fees=[Number($("gateFee").value)/100,Number($("bybitFee").value)/100,...["okxFee","mexcFee","bitgetFee"].map(id=>Number($(id).value)/100)];
  if(!(capital>0&&reserve>=0&&Number.isFinite(min)&&fees.every(f=>f>=0&&f<1)))throw Error("Проверьте параметры");
- const data=await Promise.allSettled(spotLoaders.map(f=>f()));
+ const enabled=requireEx();const data=await Promise.allSettled(spotLoaders.map((f,i)=>enabled[i]?f():Promise.resolve([])));
  const gs=data.map((d,i)=>d.status==="fulfilled"?graph(d.value,i,fees[i]):null);
  const candidates=[];let hidden=0;
  function add(type,coins,edges){const cross=edges.some(e=>e.i!==edges[0].i);const end=edges.reduce((v,e)=>v*e.rate,capital)-(cross?reserve:0);if(end>=capital*(1+min/100))candidates.push({type,coins,edges,cross,end});}
@@ -228,12 +231,12 @@ async function scan(){
  }));
  }
  cards.sort((a,b)=>Number(a.cross)-Number(b.cross)||b.pct-a.pct).forEach(x=>$("results").append(x.div)); if(typeof recordSignals==="function")recordSignals(cards);
- $("status").textContent=data.map((d,i)=>names[i]+": "+(d.status==="fulfilled"?d.value.length+" пар":"Ошибка "+d.reason.message)).join(" | ")+" | Скрыто неподтверждённых "+hidden+" | Кандидатов "+candidates.length+", проверено "+batch.length+", прошло "+passed+", недостаточно объёма "+thin+", ошибок стакана "+errors+" | "+new Date().toLocaleTimeString();
+ $("status").textContent=data.map((d,i)=>names[i]+": "+(!enabled[i]?"выключена":d.status==="fulfilled"?d.value.length+" пар":"Ошибка "+d.reason.message)).join(" | ")+" | Скрыто неподтверждённых "+hidden+" | Кандидатов "+candidates.length+", проверено "+batch.length+", прошло "+passed+", недостаточно объёма "+thin+", ошибок стакана "+errors+" | "+new Date().toLocaleTimeString();
  if(!passed){$("results").textContent="Нет сигналов, прошедших проверку в этой выборке.";}
  }catch(e){$("status").textContent="Ошибка: "+e.message;}finally{busy=false;$("scan").disabled=false;}
 }
 </script><section class="result"><h2>Арбитраж — Армения</h2><small>Курсы вводятся как количество получаемой валюты за единицу отдаваемой. Наличные и безналичные средства учитываются отдельно: например AMD-cash и AMD-card. Автоматический источник ниже — справочный, не исполнимая котировка.</small><label>Начальный актив</label><input id="amStart" value="USDT"><label>Капитал в начальном активе</label><input id="amCapital" type="number" value="1000"><label>Курсы: источник; отдаём; получаем; курс; комиссия %; фиксированная комиссия в получаемой валюте; максимум отдаваемой валюты</label><textarea id="amRates" rows="6" style="width:100%;background:#0b1220;color:white" placeholder="Обменник A;USDT;AMD-cash;380;0;0;1000"></textarea><button id="amScan">Найти замкнутые круги</button><button id="amAuto">Загрузить справочные валютные курсы</button><div id="amRef"></div><h3>Публичные курсы обменных пунктов</h3><button id="publicRates">Загрузить опубликованные курсы</button><div id="publicResults"></div><small>Публичная котировка не гарантирует объём, наличие наличных или отсутствие комиссии. USD не равен USDT.</small><a href="https://www.rate.am/en/search" target="_blank" rel="noopener" style="color:#93c5fd">Актуальные предложения Rate.am</a><div id="amResults"></div><a href="https://rate.am" style="color:#93c5fd">Rate.am</a> · <a href="https://www.bestchange.com/" style="color:#93c5fd">BestChange</a></section>
-<section class="result"><h2>Спот / фьючерсы и фандинг</h2><label>Минимальный валовой базис, %</label><input id="derMin" type="number" value="0.1" step="0.01"><button id="derScan">Проверить 5 бирж</button><small>Предварительные сигналы по котировкам, без проверки глубины фьючерсного стакана, маржи и комиссий закрытия. Фандинг сравнивается только при совпадающих интервалах и времени выплаты; ставки могут измениться.</small><div id="derResults"></div></section>
+<section class="result"><h2>Спот / фьючерсы и фандинг</h2><label>Минимальный валовой базис, %</label><input id="derMin" type="number" value="0.1" step="0.01"><button id="derScan">Проверить выбранные биржи</button><small>Предварительные сигналы по котировкам, без проверки глубины фьючерсного стакана, маржи и комиссий закрытия. Фандинг сравнивается только при совпадающих интервалах и времени выплаты; ставки могут измениться.</small><div id="derResults"></div></section>
 <script>
 (()=>{
 const el=id=>document.getElementById(id);
@@ -249,13 +252,13 @@ async()=>{const b=await request("https://api.bybit.com/v5/market/tickers?categor
 async()=>checked(await request(ox+"/market/tickers?instType=SWAP"),"0").filter(x=>x.instId.endsWith("-USDT-SWAP")).map(x=>({symbol:x.instId.replace(/-SWAP$/,""),bid:+x.bidPx,fund:NaN})),
 async()=>{const d=await request("https://contract.mexc.com/api/v1/contract/ticker");if(!d.success)throw Error("MEXC futures API");return d.data.filter(x=>x.symbol.endsWith("_USDT")).map(x=>({symbol:x.symbol.replace("_",""),bid:+x.bid1,fund:+x.fundingRate}));},
 async()=>checked(await request(bg+"/mix/market/tickers?productType=USDT-FUTURES"),"00000").map(x=>({symbol:x.symbol,bid:+x.bidPr,fund:+x.fundingRate}))];
-const all=await Promise.allSettled(spotLoaders.map(async(f,i)=>[names[i],...await Promise.all([f(),loaders[i]()])]));const failures=all.map((x,i)=>x.status==="rejected"?names[i]+": "+x.reason.message:"").filter(Boolean);const rows=[];for(const [name,spot,fut] of all.filter(x=>x.status==="fulfilled").map(x=>x.value)){const map=new Map(fut.map(x=>[x.symbol,x]));for(const s of spot){if(s.quote!=="USDT"||!(s.ask>0))continue;const f=map.get(s.symbol);if(!f||!(f.bid>0))continue;const pct=(f.bid/s.ask-1)*100;if(pct>=min)rows.push({pct,t:name+" "+s.base+" | спот покупка "+s.ask+" / шорт "+f.bid+" | "+(pct>5?"АНОМАЛИЯ — проверить актив | ":"")+"валовой базис "+pct.toFixed(3)+"% | фандинг "+(Number.isFinite(f.fund)?(f.fund*100).toFixed(4)+"%":"нет данных")+" (интервал не проверен)"});}}say("derResults",(failures.length?"Недоступные источники: "+failures.join("; ")+"\n\n":"")+(rows.sort((a,b)=>b.pct-a.pct).slice(0,30).map(x=>x.t).join("\n\n")||"Нет кандидатов по заданному порогу. Межбиржевой фандинг пока не подтверждается: нужны интервалы и время выплат."));}catch(e){say("derResults","Ошибка: "+e.message);}finally{el("derScan").disabled=false;}};
+const enabled=requireEx();const all=await Promise.allSettled(spotLoaders.map(async(f,i)=>enabled[i]?[names[i],...await Promise.all([f(),loaders[i]()])]:[names[i],[],[]]));const failures=all.map((x,i)=>x.status==="rejected"?names[i]+": "+x.reason.message:"").filter(Boolean);const rows=[];for(const [name,spot,fut] of all.filter(x=>x.status==="fulfilled").map(x=>x.value)){const map=new Map(fut.map(x=>[x.symbol,x]));for(const s of spot){if(s.quote!=="USDT"||!(s.ask>0))continue;const f=map.get(s.symbol);if(!f||!(f.bid>0))continue;const pct=(f.bid/s.ask-1)*100;if(pct>=min)rows.push({pct,t:name+" "+s.base+" | спот покупка "+s.ask+" / шорт "+f.bid+" | "+(pct>5?"АНОМАЛИЯ — проверить актив | ":"")+"валовой базис "+pct.toFixed(3)+"% | фандинг "+(Number.isFinite(f.fund)?(f.fund*100).toFixed(4)+"%":"нет данных")+" (интервал не проверен)"});}}say("derResults",(failures.length?"Недоступные источники: "+failures.join("; ")+"\n\n":"")+(rows.sort((a,b)=>b.pct-a.pct).slice(0,30).map(x=>x.t).join("\n\n")||"Нет кандидатов по заданному порогу. Межбиржевой фандинг пока не подтверждается: нужны интервалы и время выплат."));}catch(e){say("derResults","Ошибка: "+e.message);}finally{el("derScan").disabled=false;}};
 for(const id of ["amResults","amRef","derResults"])el(id).style.whiteSpace="pre-wrap";
 })();
 </script><script>
 (()=>{const out=document.getElementById("publicResults");async function load(){out.textContent="Загрузка...";try{const d=await request("./rates.json?t="+Date.now());const age=(Date.now()-Date.parse(d.fetched))/60000;if(!Number.isFinite(age)||age<0||age>60)throw Error("Снимок устарел или ещё не создан");out.textContent="Получено: "+new Date(d.fetched).toLocaleString()+"\n"+d.sources.map(s=>s.name+": "+(s.error||s.rows.map(r=>r.name+" | "+r.pair+" | покупка "+r.buy+" / продажа "+r.sell).join("\n"))).join("\n\n")+"\nПредварительные котировки: время публикации, лимиты и комиссии необходимо проверить. Не включены в подтверждённые круги.";}catch(e){out.textContent="Нет свежих данных: "+e.message;}}out.style.whiteSpace="pre-wrap";document.getElementById("publicRates").onclick=load;load();setInterval(load,300000);})();
 </script><script>
-const settingIds=["capital","minimum","gateFee","bybitFee","okxFee","mexcFee","bitgetFee","transfer","mode","riskBuffer","sound","unverified","amStart","amCapital","derMin"];
+const settingIds=["exchange0","exchange1","exchange2","exchange3","exchange4","capital","minimum","gateFee","bybitFee","okxFee","mexcFee","bitgetFee","transfer","mode","riskBuffer","sound","unverified","amStart","amCapital","derMin"];
 for(const id of settingIds){const e=$(id);try{const v=localStorage.getItem("arb42:"+id);if(v!==null){if(e.type==="checkbox")e.checked=v==="true";else e.value=v;}}catch{}e.addEventListener("change",()=>{try{localStorage.setItem("arb42:"+id,e.type==="checkbox"?String(e.checked):e.value);}catch{}});}
 let observations=[];try{observations=JSON.parse(localStorage.getItem("arb42:history")||"[]");if(!Array.isArray(observations))observations=[];}catch{}
 function showHistory(){$("history").style.whiteSpace="pre-wrap";$("history").textContent=observations.map(x=>new Date(x.time).toLocaleString()+" | "+x.route+" | "+x.pct.toFixed(2)+"% | "+(x.cross?"сеть не подтверждена":"кандидат, не сделка")).join("\n")||"Пока нет наблюдений";}
