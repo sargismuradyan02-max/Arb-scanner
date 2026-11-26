@@ -1,46 +1,10 @@
 {
-  "fetched": "2026-11-26T21:39:28.895365+00:00",
+  "fetched": "2026-11-26T22:41:18.660198+00:00",
   "sources": [
     {
       "name": "SwapGo public indicative averages",
-      "rows": [
-        {
-          "name": "Yerevan indicative average",
-          "pair": "USDT/AMD",
-          "buy": 354.0,
-          "sell": 363.0
-        },
-        {
-          "name": "Yerevan indicative average",
-          "pair": "USD/AMD",
-          "buy": 358.0,
-          "sell": 362.0
-        },
-        {
-          "name": "Yerevan indicative average",
-          "pair": "EUR/AMD",
-          "buy": 393.0,
-          "sell": 397.0
-        },
-        {
-          "name": "Yerevan indicative average",
-          "pair": "RUB/AMD",
-          "buy": 4.24,
-          "sell": 4.29
-        },
-        {
-          "name": "Yerevan indicative average",
-          "pair": "GEL/AMD",
-          "buy": 138.0,
-          "sell": 140.0
-        },
-        {
-          "name": "Yerevan indicative average",
-          "pair": "GBP/AMD",
-          "buy": 468.0,
-          "sell": 487.0
-        }
-      ]
+      "error": "HTTP Error 429: Too Many Requests",
+      "rows": []
     },
     {
       "name": "CB.am reference rates",
