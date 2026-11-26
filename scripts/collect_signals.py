@@ -9,7 +9,8 @@ def gate():
 def bybit():
     base="https://api.bybit.com/v5/market/tickers?category="
     def rows(c):
-        d=get(base+c)
+        try: d=get(base+c)
+        except Exception: d=get("https://api.bybitglobal.com/v5/market/tickers?category="+c)
         if d["retCode"]!=0: raise ValueError(d["retMsg"])
         return d["result"]["list"]
     return [(x["symbol"],x["ask1Price"]) for x in rows("spot")],[(x["symbol"],x["bid1Price"]) for x in rows("linear")]
@@ -25,7 +26,8 @@ def scan(name,fn):
         if pct<0.1: continue
         q=min(90/a,270/(a+b))
         net=pct-.2-.1*b/a-.2
-        out.append(dict(exchange=name,symbol=k,ask=a,bid=b,gross=pct,netEstimate=net,profitEstimate=q*a*net/100,anomaly=pct>5,verified=False,url="https://sargismuradyan02-max.github.io/Arb-scanner/index.html?v=7.4&symbol="+k+"&exchange="+name+"&capital=300&tp=0.3&sl=0.5&alloc=30#virtual"))
+        # Indicative only: assumes convergence, not executable profit.
+        out.append(dict(exchange=name,symbol=k,ask=a,bid=b,gross=pct,netEstimate=net,profitEstimate=q*a*net/100,anomaly=pct>5,verified=False,depthVerified=False,fundingVerified=False,exitVerified=False,notional=q*a,estimateAssumesConvergence=True,url="https://sargismuradyan02-max.github.io/Arb-scanner/index.html?v=7.4&symbol="+k+"&exchange="+name+"&capital=300&tp=0.3&sl=0.5&alloc=30#virtual"))
     return out
 def main():
     rows=[]; errors={}
@@ -35,5 +37,5 @@ def main():
             try: rows.extend(j.result())
             except Exception as e: errors[n]=str(e)
     rows.sort(key=lambda x:(x["anomaly"],-x["gross"]))
-    with open("signals.json","w") as f: json.dump(dict(time=datetime.datetime.now(datetime.timezone.utc).isoformat(),kind="spotFutures",rows=rows[:100],errors=errors,verified=False),f,indent=2,allow_nan=False)
+    with open("signals.json","w") as f: json.dump(dict(time=datetime.datetime.now(datetime.timezone.utc).isoformat(),kind="spotFutures",rows=rows[:100],errors=errors,verified=False,capital=300,allocationPct=30,executionReady=False),f,indent=2,allow_nan=False)
 if __name__=="__main__": main()
