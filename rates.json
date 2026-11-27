@@ -1,5 +1,5 @@
 {
-  "fetched": "2026-11-27T11:41:54.458008+00:00",
+  "fetched": "2026-11-27T12:48:36.288550+00:00",
   "sources": [
     {
       "name": "SwapGo public indicative averages",
@@ -48,20 +48,20 @@
         {
           "name": "Reference only, not exchange quote",
           "pair": "USD/AMD",
-          "buy": 360.28,
-          "sell": 360.28
+          "buy": 360.12,
+          "sell": 360.12
         },
         {
           "name": "Reference only, not exchange quote",
           "pair": "EUR/AMD",
-          "buy": 395.37,
-          "sell": 395.37
+          "buy": 394.84,
+          "sell": 394.84
         },
         {
           "name": "Reference only, not exchange quote",
           "pair": "RUB/AMD",
-          "buy": 4.3892,
-          "sell": 4.3892
+          "buy": 4.383,
+          "sell": 4.383
         }
       ]
     }
