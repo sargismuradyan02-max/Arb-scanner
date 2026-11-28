@@ -1,5 +1,5 @@
 {
-  "fetched": "2026-11-28T08:27:24.332826+00:00",
+  "fetched": "2026-11-28T09:28:37.632286+00:00",
   "sources": [
     {
       "name": "SwapGo public indicative averages",
@@ -13,20 +13,20 @@
         {
           "name": "Yerevan indicative average",
           "pair": "USD/AMD",
-          "buy": 358.0,
+          "buy": 357.0,
           "sell": 361.0
         },
         {
           "name": "Yerevan indicative average",
           "pair": "EUR/AMD",
           "buy": 393.0,
-          "sell": 397.0
+          "sell": 396.0
         },
         {
           "name": "Yerevan indicative average",
           "pair": "RUB/AMD",
           "buy": 4.23,
-          "sell": 4.28
+          "sell": 4.27
         },
         {
           "name": "Yerevan indicative average",
@@ -37,7 +37,7 @@
         {
           "name": "Yerevan indicative average",
           "pair": "GBP/AMD",
-          "buy": 467.0,
+          "buy": 466.0,
           "sell": 486.0
         }
       ]
